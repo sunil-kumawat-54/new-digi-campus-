@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import * as LucideIcons from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 
 // ─── GLOBAL MOCK DATA ───────────────────────────────────────────────
@@ -550,17 +551,28 @@ window.AttendanceModule = function AttendanceModule() {
 
 // ─── STUDENT MANAGEMENT MODULE ──────────────────────────────────────────────
 window.StudentManagementModule = function StudentManagementModule() {
-  const d = window.OrchestraData;
   const [search, setSearch] = useState('');
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      const { data, error } = await supabase.from('students').select('*').order('name');
+      if (data) setStudents(data);
+      if (error) console.error(error);
+      setLoading(false);
+    };
+    fetchStudents();
+  }, []);
   
-  const filtered = d.students.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) || 
-    s.id.toLowerCase().includes(search.toLowerCase())
+  const filtered = students.filter(s => 
+    (s.name && s.name.toLowerCase().includes(search.toLowerCase())) || 
+    (s.enrollment_number && s.enrollment_number.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
     <div className="page-enter" style={{ padding: 24 }}>
-      <h2 className="font-syne" style={{ fontSize: 20, fontWeight: 800, marginBottom: 20 }}>Student Management</h2>
+      <h2 className="font-syne" style={{ fontSize: 20, fontWeight: 800, marginBottom: 20 }}>Student Management (Live)</h2>
       <div style={{ marginBottom: 20 }}>
         <input 
           className="input-field" 
@@ -571,24 +583,32 @@ window.StudentManagementModule = function StudentManagementModule() {
         />
       </div>
       <div className="glass-card" style={{ overflow: 'hidden' }}>
-        <table className="data-table">
-          <thead>
-            <tr><th>ID</th><th>Name</th><th>Branch</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map(s => (
-              <tr key={s.id}>
-                <td style={{ fontSize: 12 }}>{s.id}</td>
-                <td style={{ fontWeight: 600 }}>{s.name}</td>
-                <td>{s.branch}</td>
-                <td><span className={`badge ${s.status==='Active'?'badge-mint':'badge-red'}`}>{s.status}</span></td>
-                <td>
-                  <button className="btn-outline" style={{ fontSize: 11 }} onClick={() => notify(`Viewing records for ${s.name}...`)}>Full File</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <div style={{ padding: 20, textAlign: 'center', color: '#64748B' }}>Loading live data from Supabase...</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr><th>ID</th><th>Name</th><th>Branch</th><th>Semester</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {filtered.map(s => (
+                <tr key={s.id}>
+                  <td style={{ fontSize: 12 }}>{s.enrollment_number}</td>
+                  <td style={{ fontWeight: 600 }}>{s.name}</td>
+                  <td>{s.department}</td>
+                  <td>Sem {s.semester}</td>
+                  <td><span className={`badge badge-mint`}>Active</span></td>
+                  <td>
+                    <button className="btn-outline" style={{ fontSize: 11 }} onClick={() => notify(`Viewing records for ${s.name}...`)}>Full File</button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: 20 }}>No students found in Supabase.</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
